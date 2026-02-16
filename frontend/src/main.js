@@ -28,6 +28,7 @@ async function initPayrails() {
   }
 
   const environment = window.__PAYRAILS_ENV__ || "TEST";
+  console.log(`Initializing Payrails in ${environment} environment... with config ${initJson ? JSON.stringify(initJson) : "N/A"}`);
   const payrailsClient = await Payrails.init(initJson, { environment });
 
   const cardForm = payrailsClient.cardForm();
@@ -41,7 +42,7 @@ async function handleSubmit(cardForm) {
   setStatus("Tokenizing card...");
 
   try {
-    const instrument = await cardForm.collectValues();
+    const instrument = await cardForm.tokenize();
 
     const instrumentId =
       instrument?.id || instrument?.instrumentId || instrument?.paymentInstrumentId;

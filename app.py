@@ -165,12 +165,8 @@ def payrails_init():
     payload = {
         "type": "tokenization",
         "holderReference": _generate_holder_reference(),
-        "amount": {
-            "value": "0.00",
-            "currency": "EUR"
-        }
     }
-    payload.update(_parse_json_env("PAYRAILS_INIT_EXTRA_JSON"))
+    # payload.update(_parse_json_env("PAYRAILS_INIT_EXTRA_JSON"))
 
     try:
         headers = _build_headers()
@@ -179,7 +175,6 @@ def payrails_init():
     except AuthError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
     except requests.RequestException as exc:
-        print(f"Request failed: {exc}")
         return jsonify({"error": str(exc)}), 502
 
     return _proxy_response(resp)
@@ -193,31 +188,64 @@ def create_execution():
 
     data = request.get_json(silent=True) or {}
     instrument_id = data.get("instrumentId")
-    instrument = data.get("instrument")
+    holder_id = data.get("instrument").get("holderId")
 
     if not instrument_id:
         return jsonify({"error": "instrumentId is required"}), 400
+
+    if not holder_id:
+        return jsonify({"error": "holderId is required"}), 400
 
     prefix = os.environ.get("PAYRAILS_MERCHANT_REFERENCE_PREFIX", "demo")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     merchant_reference = f"{prefix}-{timestamp}-{uuid.uuid4().hex[:8]}"
 
+    amount = {
+        "value": "10.00",
+        "currency": "USD",
+    }
+
     payload = {
         "merchantReference": merchant_reference,
-        "holderReference": _generate_holder_reference(),
-        "paymentInstrumentId": instrument_id,
-        "meta": {
-            "instrumentId": instrument_id,
-        },
+        "holderReference": holder_id,
+        "initialActions": [
+            {
+                "action": "authorize",
+                "body": {
+                    "amount": {
+                        "value": amount["value"],
+                        "currency": amount["currency"],
+                    },
+                    "returnInfo": {
+                        "success": "https://example.com/success",
+                        "cancel": "https://example.com/cancel",
+                        "error": "https://example.com/error",
+                        "pending": "https://example.com/pending",
+                    },
+                    "paymentComposition": [
+                        {
+                            "paymentMethodCode": "card",
+                            "integrationType": "api",
+                            "amount": {
+                                "value": amount["value"],
+                                "currency": amount["currency"],
+                            },
+                            "paymentInstrumentId": instrument_id,
+                            "storeInstrument": False,
+                        }
+                    ],
+                }
+            }
+        ],
     }
-    if instrument is not None:
-        payload["meta"]["instrument"] = instrument
 
     payload.update(_parse_json_env("PAYRAILS_EXECUTION_EXTRA_JSON"))
 
     try:
         headers = _build_headers()
+        headers["x-idempotency-key"] = str(uuid.uuid4())
         resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        print(resp)
     except AuthError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
     except requests.RequestException as exc:
