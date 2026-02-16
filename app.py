@@ -188,13 +188,13 @@ def create_execution():
 
     data = request.get_json(silent=True) or {}
     instrument_id = data.get("instrumentId")
-    holder_id = data.get("instrument").get("holderId")
+    holder_ref = data.get("instrument").get("holderReference")
 
     if not instrument_id:
         return jsonify({"error": "instrumentId is required"}), 400
 
-    if not holder_id:
-        return jsonify({"error": "holderId is required"}), 400
+    if not holder_ref:
+        return jsonify({"error": "holderReference is required"}), 400
 
     prefix = os.environ.get("PAYRAILS_MERCHANT_REFERENCE_PREFIX", "demo")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -207,7 +207,7 @@ def create_execution():
 
     payload = {
         "merchantReference": merchant_reference,
-        "holderReference": holder_id,
+        "holderReference": holder_ref,
         "initialActions": [
             {
                 "action": "authorize",
